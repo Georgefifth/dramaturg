@@ -9,10 +9,15 @@ from google.genai import types
 from parallel import Parallel
 from pydantic import BaseModel, Field
 
-from models import Claim, Dossier, Source, Verdict
+from models import Claim, Dossier, Source, Stance, Verdict
 
 
 load_dotenv()
+
+
+class SourceAssessment(BaseModel):
+    source_id: str
+    stance: Stance
 
 
 class VerificationResult(BaseModel):
@@ -21,12 +26,14 @@ class VerificationResult(BaseModel):
     confidence: int = Field(ge=0, le=100)
     finding: str
     correction: str | None = None
+    citations: list[str] = Field(default_factory=list)
+    source_assessments: list[SourceAssessment] = Field(default_factory=list)
 
 
 EXTRACTION_PROMPT = """You are the claim extraction stage of Dramaturg, an accuracy agent for screenwriters.
-Extract only concrete, externally verifiable real-world claims from the screenplay scene. Focus on dates, historical events, geography, technology availability, law, professional procedure, and period culture. Do not judge accuracy yet. Ignore fictional emotions and invented characters. Return no more than 5 high-value claims. Each search query must be a concise 3-6 word keyword query. IDs must be C1, C2, and so on."""
+Extract only concrete, externally verifiable real-world claims from the screenplay scene. Focus on dates, historical events, geography, technology availability, law, professional procedure, and period culture. Do not judge accuracy yet. Ignore fictional emotions and invented characters. Return no more than 5 high-value claims. For script_quote, copy the shortest exact, character-for-character substring from the screenplay that expresses the claim. Never paraphrase script_quote. Each search query must be a concise 3-6 word keyword query. IDs must be C1, C2, and so on. Leave offsets null; the application computes them deterministically."""
 
-VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent. Do not invent citations or facts."""
+VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. For every source, classify its stance as SUPPORTS, REFUTES, CONTEXT, or CONFLICTS. Include only source IDs that directly justify the finding in citations, and cite those IDs inline like [S1]. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent. Do not invent citations or facts."""
 
 
 def _gemini_client() -> genai.Client:
@@ -41,6 +48,17 @@ def _parallel_client() -> Parallel:
     if not api_key:
         raise RuntimeError("PARALLEL_API_KEY is required for live analysis")
     return Parallel(api_key=api_key)
+
+
+def locate_claim(scene: str, claim: Claim) -> Claim:
+    located = claim.model_copy(deep=True)
+    if not located.script_quote:
+        return located
+    start = scene.lower().find(located.script_quote.lower())
+    if start >= 0:
+        located.start_offset = start
+        located.end_offset = start + len(located.script_quote)
+    return located
 
 
 def extract_claims(scene: str) -> list[Claim]:
@@ -58,7 +76,7 @@ def extract_claims(scene: str) -> list[Claim]:
     claims = response.parsed
     if claims is None:
         claims = [Claim.model_validate(item) for item in json.loads(response.text)]
-    return claims[:5]
+    return [locate_claim(scene, claim) for claim in claims[:5]]
 
 
 def search_claim(claim: Claim) -> list[Source]:
@@ -68,10 +86,10 @@ def search_claim(claim: Claim) -> list[Source]:
         mode="fast",
     )
     sources = []
-    for result in search.results[:3]:
+    for index, result in enumerate(search.results[:3], 1):
         excerpt = " ".join(result.excerpts[:2]).strip()
         if excerpt:
-            sources.append(Source(title=result.title or result.url, url=result.url, excerpt=excerpt[:900]))
+            sources.append(Source(id=f"S{index}", title=result.title or result.url, url=result.url, excerpt=excerpt[:900]))
     return sources
 
 
@@ -113,9 +131,14 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
                 confidence=0,
                 finding="Parallel Search returned no usable evidence for this claim." if not sources else "No verification result was returned for this claim.",
                 correction=None,
+                citations=[],
                 sources=sources,
             ))
             continue
+        assessments = {item.source_id: item.stance for item in result.source_assessments}
+        sources = [source.model_copy(update={"stance": assessments.get(source.id, "CONTEXT")}) for source in sources]
+        source_ids = {source.id for source in sources}
+        citations = [citation for citation in result.citations if citation in source_ids]
         status = result.status.upper() if result.status.upper() in allowed else "UNVERIFIED"
         verdicts.append(Verdict(
             claim=claim,
@@ -123,6 +146,7 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
             confidence=result.confidence,
             finding=result.finding,
             correction=result.correction,
+            citations=citations,
             sources=sources,
         ))
     return verdicts

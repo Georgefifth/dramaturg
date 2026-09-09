@@ -23,8 +23,17 @@ Where most creative agents generate, Dramaturg verifies.
 
 ## Product modes
 
-- **Live verification:** available when both API keys are configured. Every analysis calls Gemini and Parallel Search at runtime.
+- **Live verification:** available when both API keys are configured. Every new analysis calls Gemini and Parallel Search at runtime.
 - **Evidence sample:** a clearly labeled, curated Berlin Wall scene for reliable product evaluation without credentials. Sample results are never presented as live calls.
+
+## Review workflow
+
+- Exact screenplay quotes are located deterministically and highlighted by verdict status.
+- Selecting a highlight opens its claim-level finding; selecting a finding returns to the original line.
+- Every source is classified as `SUPPORTS`, `REFUTES`, `CONTEXT`, or `CONFLICTS`, and findings carry explicit source IDs.
+- Writers close the loop with `Accept fix`, `Keep as written`, or `Needs research`.
+- JSON export includes the evidence dossier and the writer's complete Decision Log.
+- Repeated scenes use an in-memory evidence cache, while per-IP, daily, and concurrency limits protect public provider budgets.
 
 ## Architecture
 
@@ -114,8 +123,10 @@ Create the referenced secrets in Google Cloud Secret Manager before deployment. 
 - Findings must be based on retrieved evidence, not unsupported model memory.
 - Conflicting credible sources are preserved as `CONFLICTED` rather than collapsed into false certainty.
 - Missing evidence becomes `UNVERIFIED`.
-- Source URLs and excerpts remain visible.
+- Source URLs, excerpts, evidence stances, and citation IDs remain visible.
 - The tool proposes corrections but never edits the screenplay automatically.
+- Writer overrides and research decisions are preserved in the exported production record.
+- Public analysis is rate-limited, single-concurrency, and cached to protect API budgets.
 
 ## License
 

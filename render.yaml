@@ -13,3 +13,9 @@ services:
         value: gemini-3.5-flash
       - key: GEMINI_REQUEST_DELAY_SECONDS
         value: "30"
+      - key: RATE_LIMIT_PER_HOUR
+        value: "3"
+      - key: GLOBAL_DAILY_ANALYSIS_LIMIT
+        value: "50"
+      - key: ANALYSIS_CACHE_TTL_SECONDS
+        value: "21600"

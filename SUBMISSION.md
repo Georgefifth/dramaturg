@@ -10,7 +10,7 @@ Film production has many creative tools, but one quiet bottleneck remains manual
 
 ## What it does
 
-Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini first isolates claims that can be checked externally. Parallel Search then retrieves live web evidence for each claim. Gemini compares each claim only against that evidence and marks it Verified, Inaccurate, Conflicted, or Unverified. Every verdict keeps its excerpts and clickable sources, and inaccurate details receive a production-ready correction. The screenplay is never silently rewritten; the writer retains final authority.
+Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini first isolates claims that can be checked externally. Parallel Search then retrieves live web evidence for each claim. Gemini compares each claim only against that evidence and marks it Verified, Inaccurate, Conflicted, or Unverified. Exact claims are highlighted in the original screenplay, every source is classified by evidentiary stance, and findings cite source IDs directly. Writers close the review with Accept fix, Keep as written, or Needs research; the exported Decision Log preserves their final authority.
 
 ## How we built it
 
@@ -24,7 +24,9 @@ The central design challenge was avoiding a second hallucination layer in the ve
 
 - A narrow, complete workflow for a real film-production role instead of another general creative generator.
 - Runtime integration of both Gemini and Parallel Search, visible in the source code.
-- Claim-level provenance and four honest evidence states.
+- Claim-level provenance, exact script highlighting, source stances, and four honest evidence states.
+- A human decision loop with production-ready corrections and an exportable audit record.
+- Cache, per-IP limits, a global budget ceiling, and single concurrency to protect public API credentials.
 - A product experience that turns web research into actionable production corrections while protecting human authorship.
 
 ## What we learned

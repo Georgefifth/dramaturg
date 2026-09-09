@@ -6,6 +6,7 @@
   <meta name="description" content="Dramaturg verifies real-world screenplay details with Gemini and Parallel Search.">
   <title>Dramaturg — Evidence before production</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/review.css">
 </head>
 <body>
   <header class="nav">
@@ -26,7 +27,7 @@
         <div class="panel-head"><div><span class="step">01</span><h2>Screenplay scene</h2></div><span id="charCount">0 / 12,000</span></div>
         <textarea id="sceneInput" maxlength="12000" spellcheck="false" placeholder="INT. LOCATION — NIGHT&#10;&#10;Paste a scene with real-world details to verify..."></textarea>
         <div class="editor-actions">
-          <button id="loadSample" class="button ghost">Load Berlin sample</button>
+          <button id="loadSample" class="button ghost">Load evidence sample</button>
           <button id="analyze" class="button primary">Run live verification <span>→</span></button>
         </div>
         <p id="liveHint" class="microcopy"></p>
@@ -39,7 +40,7 @@
           <li><span>1</span><div><strong>Extract claims</strong><small>Gemini isolates facts worth checking</small></div></li>
           <li><span>2</span><div><strong>Search the live web</strong><small>Parallel retrieves traceable evidence</small></div></li>
           <li><span>3</span><div><strong>Test each claim</strong><small>Evidence supports, refutes, or conflicts</small></div></li>
-          <li><span>4</span><div><strong>Keep human authority</strong><small>You decide what belongs in the script</small></div></li>
+          <li><span>4</span><div><strong>Keep human authority</strong><small>You accept, override, or investigate</small></div></li>
         </ol>
         <div class="method-note">No silent rewrites. No invented citations. Conflicting sources remain visible.</div>
       </aside>
@@ -53,15 +54,29 @@
     <section id="results" class="results hidden">
       <div class="results-head">
         <div><div class="eyebrow">Accuracy dossier · <span id="resultMode"></span></div><h2 id="dossierTitle">Scene review</h2></div>
-        <button id="exportBtn" class="button ghost">Export JSON</button>
+        <button id="exportBtn" class="button ghost">Export dossier + decisions</button>
       </div>
       <div id="scoreGrid" class="score-grid"></div>
-      <div class="ledger-head"><div><span class="step">03</span><h2>Claim ledger</h2></div><span>Source-linked findings</span></div>
-      <div id="verdicts" class="verdict-list"></div>
+      <div class="decision-summary">
+        <div><span class="step">Human review</span><strong id="decisionCount">0 of 0 decisions made</strong></div>
+        <div class="progress-track"><span id="decisionProgress"></span></div>
+        <span id="decisionBreakdown">The writer retains final authority.</span>
+      </div>
+      <div class="review-layout">
+        <aside class="annotated-panel">
+          <div class="ledger-head"><div><span class="step">03</span><h2>Marked screenplay</h2></div><span>Click a highlight</span></div>
+          <div class="annotation-legend"><span class="legend inaccurate">Inaccurate</span><span class="legend verified">Verified</span><span class="legend conflicted">Conflicted</span><span class="legend unverified">Unverified</span></div>
+          <pre id="annotatedScene" class="annotated-scene"></pre>
+        </aside>
+        <div class="ledger-panel">
+          <div class="ledger-head"><div><span class="step">04</span><h2>Claim ledger</h2></div><span>Source-linked findings</span></div>
+          <div id="verdicts" class="verdict-list"></div>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer><span>Dramaturg</span><p>Built for screenwriters and studio crews. The writer always has final authority.</p></footer>
+  <footer><span>Dramaturg</span><p>Ephemeral processing. The writer always has final authority.</p></footer>
   <script src="/static/app.js"></script>
 </body>
 </html>
