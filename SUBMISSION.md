@@ -1,5 +1,9 @@
 # Devpost submission draft
 
+**Live product:** https://dramaturg.onrender.com
+
+**Source code:** https://github.com/Georgefifth/dramaturg
+
 ## Inspiration
 
 Film production has many creative tools, but one quiet bottleneck remains manual: checking whether a scene's real-world details are actually true. A wrong date, border procedure, medical step, or period technology can survive until props, locations, and dialogue are already expensive to change. We built the AI equivalent of a dramaturg—the production specialist who protects factual integrity.

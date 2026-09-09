@@ -6,6 +6,8 @@ Dramaturg is an AI accuracy agent for screenwriters and studio crews. Paste a sc
 
 Built for the **Parallel track** of [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.devpost.com/).
 
+**Live product:** https://dramaturg.onrender.com
+
 ## The problem
 
 Historical, legal, medical, technical, and location details often survive into production before anybody checks them systematically. By then, corrections affect props, locations, dialogue, schedules, and budgets. General-purpose writing assistants can produce plausible prose, but plausibility is not evidence.
