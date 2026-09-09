@@ -10,20 +10,21 @@ Film production has many creative tools, but one quiet bottleneck remains manual
 
 ## What it does
 
-Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini first isolates claims that can be checked externally. Parallel Search then retrieves live web evidence for each claim. Gemini compares each claim only against that evidence and marks it Verified, Inaccurate, Conflicted, or Unverified. Exact claims are highlighted in the original screenplay, every source is classified by evidentiary stance, and findings cite source IDs directly. Writers close the review with Accept fix, Keep as written, or Needs research; the exported Decision Log preserves their final authority.
+Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini isolates claims that can be checked externally, and Parallel Search retrieves live evidence for each one. A Gemini coverage director then asks whether that evidence can actually support a verdict. It selects at most two consequential gaps, rewrites their search queries, and dispatches targeted second-pass Parallel searches before final verification. Exact claims are highlighted in the original screenplay, every source is classified by evidentiary stance, and findings cite source IDs directly. Writers close the review with Accept fix, Keep as written, or Needs research; the exported Decision Log preserves their final authority.
 
 ## How we built it
 
-The web application uses FastAPI and a responsive vanilla JavaScript interface deployed in a container suitable for Google Cloud Run. It uses Google's official `google-genai` SDK for structured claim extraction and evidence-constrained verification. It uses Parallel's official `parallel-web` SDK at runtime, executing one focused Search API request for every extracted claim. Typed Pydantic contracts carry claims, sources, verdicts, and the final dossier through the pipeline.
+The web application uses FastAPI and a responsive vanilla JavaScript interface deployed as a container on Render. It uses Google's official `google-genai` SDK for structured claim extraction, evidence coverage auditing, query reformulation, and final verification. It uses Parallel's official `parallel-web` SDK at runtime for every initial search and each agent-directed follow-up. Typed Pydantic contracts carry claims, sources, coverage decisions, research traces, verdicts, and the final dossier through the pipeline.
 
 ## Challenges we ran into
 
-The central design challenge was avoiding a second hallucination layer in the verifier. We constrained verification to retrieved excerpts, exposed every source, preserved disagreements as Conflicted, and made insufficient evidence an explicit Unverified result. We also separated live analysis from a clearly labeled evidence sample so evaluators are never misled about whether an API call occurred.
+The central design challenge was avoiding a second hallucination layer in the verifier without turning the agent into a rigid one-shot pipeline. We separated evidence coverage from truth judgment: the coverage director may identify a precise gap and reformulate a search, but the verifier remains constrained to Parallel's retrieved excerpts. Follow-up searches are capped, sources are deduplicated, disagreements remain Conflicted, and insufficient evidence becomes an explicit Unverified result. Live analysis and the curated evidence sample are always labeled separately.
 
 ## Accomplishments that we're proud of
 
 - A narrow, complete workflow for a real film-production role instead of another general creative generator.
 - Runtime integration of both Gemini and Parallel Search, visible in the source code.
+- A bounded agent loop that audits coverage, reformulates weak queries, and dispatches targeted Parallel re-searches.
 - Claim-level provenance, exact script highlighting, source stances, and four honest evidence states.
 - A human decision loop with production-ready corrections and an exportable audit record.
 - Cache, per-IP limits, a global budget ceiling, and single concurrency to protect public API credentials.

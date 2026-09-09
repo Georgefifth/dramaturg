@@ -16,8 +16,10 @@ Dramaturg inserts an evidence gate before production:
 
 1. **Gemini extracts claims** worth checking from the scene.
 2. **Parallel Search runs at runtime** for every claim and returns current, traceable excerpts.
-3. **Gemini tests the claim against only that retrieved evidence.**
-4. The dossier marks it `VERIFIED`, `INACCURATE`, `CONFLICTED`, or `UNVERIFIED`, with production-ready corrections and clickable sources.
+3. **Gemini audits evidence coverage** and identifies the most consequential unresolved gaps.
+4. **Parallel runs up to two targeted second searches** using Gemini's refined queries.
+5. **Gemini tests each claim against the completed evidence record.**
+6. The dossier marks it `VERIFIED`, `INACCURATE`, `CONFLICTED`, or `UNVERIFIED`, with production-ready corrections and clickable sources.
 
 Where most creative agents generate, Dramaturg verifies.
 
@@ -44,9 +46,18 @@ Screenplay scene
 Gemini structured claim extraction
       │  claim + verification question + search queries
       ▼
-Parallel Search API (one live search per claim)
+Parallel Search API (initial search per claim)
       │  source URL + title + relevant excerpts
       ▼
+Gemini coverage audit
+      │  sufficient ────────────────┐
+      │  evidence gap              │
+      ▼                            │
+Parallel targeted re-search        │
+      │  deduplicated evidence     │
+      └────────────────────────────┘
+                    │
+                    ▼
 Gemini evidence-constrained verification
       │
       ▼

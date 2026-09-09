@@ -9,7 +9,7 @@ from google.genai import types
 from parallel import Parallel
 from pydantic import BaseModel, Field
 
-from models import Claim, Dossier, Source, Stance, Verdict
+from models import Claim, Dossier, ResearchTrace, Source, Stance, Verdict
 
 
 load_dotenv()
@@ -18,6 +18,13 @@ load_dotenv()
 class SourceAssessment(BaseModel):
     source_id: str
     stance: Stance
+
+
+class CoverageResult(BaseModel):
+    claim_id: str
+    status: str
+    rationale: str
+    refined_queries: list[str] = Field(default_factory=list, max_length=2)
 
 
 class VerificationResult(BaseModel):
@@ -33,7 +40,9 @@ class VerificationResult(BaseModel):
 EXTRACTION_PROMPT = """You are the claim extraction stage of Dramaturg, an accuracy agent for screenwriters.
 Extract only concrete, externally verifiable real-world claims from the screenplay scene. Focus on dates, historical events, geography, technology availability, law, professional procedure, and period culture. Do not judge accuracy yet. Ignore fictional emotions and invented characters. Return no more than 5 high-value claims. For script_quote, copy the shortest exact, character-for-character substring from the screenplay that expresses the claim. Never paraphrase script_quote. Each search query must be a concise 3-6 word keyword query. IDs must be C1, C2, and so on. Leave offsets null; the application computes them deterministically."""
 
-VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. For every source, classify its stance as SUPPORTS, REFUTES, CONTEXT, or CONFLICTS. Include only source IDs that directly justify the finding in citations, and cite those IDs inline like [S1]. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent. Do not invent citations or facts."""
+COVERAGE_PROMPT = """You are the evidence coverage director in a screenplay research agent. Audit whether the attached Parallel Search excerpts are sufficient to judge each claim without relying on model memory. Status must be exactly SUFFICIENT or NEEDS_MORE. Use NEEDS_MORE only when a specific missing fact, primary source, date, jurisdiction, or credible counter-source could materially change the verdict. For NEEDS_MORE, provide one or two concise 3-6 word refined search queries targeting that gap. Select at most two claims for NEEDS_MORE across the entire batch; prioritize the highest production risk. Explain the evidence gap in one compact sentence. Do not judge whether the screenplay claim is true yet."""
+
+VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Evidence may include an initial search and a coverage-directed second search. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. For every source, classify its stance as SUPPORTS, REFUTES, CONTEXT, or CONFLICTS. Include only source IDs that directly justify the finding in citations, and cite those IDs inline like [S1]. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent. Do not invent citations or facts."""
 
 
 def _gemini_client() -> genai.Client:
@@ -79,10 +88,12 @@ def extract_claims(scene: str) -> list[Claim]:
     return [locate_claim(scene, claim) for claim in claims[:5]]
 
 
-def search_claim(claim: Claim) -> list[Source]:
+def search_claim(claim: Claim, search_queries: list[str] | None = None) -> list[Source]:
+    queries = search_queries or claim.search_queries
+    objective = "Resolve the identified evidence gap for" if search_queries else "Find authoritative evidence to verify"
     search = _parallel_client().search(
-        objective=f"Find authoritative evidence to verify this screenplay claim: {claim.question}",
-        search_queries=claim.search_queries,
+        objective=f"{objective} this screenplay claim: {claim.question}",
+        search_queries=queries,
         mode="fast",
     )
     sources = []
@@ -91,6 +102,78 @@ def search_claim(claim: Claim) -> list[Source]:
         if excerpt:
             sources.append(Source(id=f"S{index}", title=result.title or result.url, url=result.url, excerpt=excerpt[:900]))
     return sources
+
+
+def merge_sources(initial: list[Source], follow_up: list[Source]) -> list[Source]:
+    merged = []
+    seen = set()
+    for source in initial + follow_up:
+        normalized_url = source.url.lower().rstrip("/")
+        if normalized_url in seen:
+            continue
+        seen.add(normalized_url)
+        merged.append(source.model_copy(update={"id": f"S{len(merged) + 1}"}))
+    return merged[:6]
+
+
+def research_targets(audits: list[CoverageResult]) -> list[CoverageResult]:
+    return [audit for audit in audits if audit.status.upper() == "NEEDS_MORE" and audit.refined_queries][:2]
+
+
+def audit_coverage(claims: list[Claim], evidence_by_claim: dict[str, list[Source]]) -> list[CoverageResult]:
+    payload = [{
+        "claim_id": claim.id,
+        "claim": claim.text,
+        "question": claim.question,
+        "evidence": [source.model_dump() for source in evidence_by_claim[claim.id]],
+    } for claim in claims]
+    time.sleep(max(0, float(os.getenv("GEMINI_REQUEST_DELAY_SECONDS", "30"))))
+    client = _gemini_client()
+    response = client.models.generate_content(
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+        contents=json.dumps(payload, ensure_ascii=False),
+        config=types.GenerateContentConfig(
+            system_instruction=COVERAGE_PROMPT,
+            response_mime_type="application/json",
+            response_schema=list[CoverageResult],
+            temperature=0.1,
+        ),
+    )
+    audits = response.parsed
+    if audits is None:
+        audits = [CoverageResult.model_validate(item) for item in json.loads(response.text)]
+    known_ids = {claim.id for claim in claims}
+    return [audit for audit in audits if audit.claim_id in known_ids]
+
+
+def expand_evidence(claims: list[Claim], evidence_by_claim: dict[str, list[Source]], audits: list[CoverageResult]) -> tuple[dict[str, list[Source]], list[ResearchTrace]]:
+    targets = {audit.claim_id: audit for audit in research_targets(audits)}
+    audit_map = {audit.claim_id: audit for audit in audits}
+    traces = []
+    for claim in claims:
+        initial_count = len(evidence_by_claim[claim.id])
+        audit = audit_map.get(claim.id)
+        if audit is None:
+            traces.append(ResearchTrace(claim_id=claim.id, status="INSUFFICIENT", rationale="The coverage audit returned no result for this claim.", initial_source_count=initial_count))
+            continue
+        target = targets.get(claim.id)
+        if target is None:
+            status = "SUFFICIENT" if audit.status.upper() == "SUFFICIENT" else "INSUFFICIENT"
+            traces.append(ResearchTrace(claim_id=claim.id, status=status, rationale=audit.rationale, initial_source_count=initial_count, refined_queries=audit.refined_queries))
+            continue
+        follow_up = search_claim(claim, target.refined_queries)
+        merged = merge_sources(evidence_by_claim[claim.id], follow_up)
+        added_count = len(merged) - initial_count
+        evidence_by_claim[claim.id] = merged
+        traces.append(ResearchTrace(
+            claim_id=claim.id,
+            status="RESEARCHED" if added_count else "INSUFFICIENT",
+            rationale=target.rationale,
+            initial_source_count=initial_count,
+            refined_queries=target.refined_queries,
+            added_source_count=max(0, added_count),
+        ))
+    return evidence_by_claim, traces
 
 
 def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]]) -> list[Verdict]:
@@ -157,6 +240,8 @@ def analyze_scene(scene: str) -> Dossier:
     if not claims:
         raise ValueError("No externally verifiable claims were found in this scene")
     evidence_by_claim = {claim.id: search_claim(claim) for claim in claims}
+    audits = audit_coverage(claims, evidence_by_claim)
+    evidence_by_claim, research_trace = expand_evidence(claims, evidence_by_claim, audits)
     verdicts = verify_claims(claims, evidence_by_claim)
     counts = Counter(verdict.status.lower() for verdict in verdicts)
     return Dossier(
@@ -164,6 +249,7 @@ def analyze_scene(scene: str) -> Dossier:
         mode="live",
         scene=scene,
         verdicts=verdicts,
+        research_trace=research_trace,
         summary={
             "total": len(verdicts),
             "verified": counts["verified"],

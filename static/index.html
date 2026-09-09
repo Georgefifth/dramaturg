@@ -39,8 +39,10 @@
         <ol class="pipeline">
           <li><span>1</span><div><strong>Extract claims</strong><small>Gemini isolates facts worth checking</small></div></li>
           <li><span>2</span><div><strong>Search the live web</strong><small>Parallel retrieves traceable evidence</small></div></li>
-          <li><span>3</span><div><strong>Test each claim</strong><small>Evidence supports, refutes, or conflicts</small></div></li>
-          <li><span>4</span><div><strong>Keep human authority</strong><small>You accept, override, or investigate</small></div></li>
+          <li><span>3</span><div><strong>Audit coverage</strong><small>Gemini identifies consequential evidence gaps</small></div></li>
+          <li><span>4</span><div><strong>Research the gaps</strong><small>Parallel runs up to two targeted second passes</small></div></li>
+          <li><span>5</span><div><strong>Test each claim</strong><small>Evidence supports, refutes, or conflicts</small></div></li>
+          <li><span>6</span><div><strong>Keep human authority</strong><small>You accept, override, or investigate</small></div></li>
         </ol>
         <div class="method-note">No silent rewrites. No invented citations. Conflicting sources remain visible.</div>
       </aside>
@@ -57,6 +59,7 @@
         <button id="exportBtn" class="button ghost">Export dossier + decisions</button>
       </div>
       <div id="scoreGrid" class="score-grid"></div>
+      <div id="researchSummary" class="research-summary"></div>
       <div class="decision-summary">
         <div><span class="step">Human review</span><strong id="decisionCount">0 of 0 decisions made</strong></div>
         <div class="progress-track"><span id="decisionProgress"></span></div>

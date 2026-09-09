@@ -51,9 +51,11 @@ analyzeButton.addEventListener('click', async () => {
   loading.classList.remove('hidden');
   const stages = [
     ['Extracting claims', 'Gemini is isolating dates, places, procedures, and period details…'],
-    ['Searching the live web', 'Parallel is retrieving source-linked evidence for every claim…'],
+    ['Running the first search pass', 'Parallel is retrieving source-linked evidence for every claim…'],
+    ['Auditing evidence coverage', 'Gemini is looking for gaps that could materially change a verdict…'],
+    ['Researching targeted gaps', 'Parallel may run a focused second pass for up to two claims…'],
     ['Respecting the rate limit', 'Pausing before the evidence-constrained verification pass…'],
-    ['Testing the evidence', 'Gemini is classifying sources and checking every claim…']
+    ['Testing the complete record', 'Gemini is classifying sources and checking every claim…']
   ];
   let stage = 0;
   const timer = setInterval(() => {
@@ -111,12 +113,21 @@ function renderDossier(dossier) {
   document.querySelector('#dossierTitle').textContent = dossier.title;
   const order = [['total','Claims'],['verified','Verified'],['inaccurate','Inaccurate'],['conflicted','Conflicted'],['unverified','Unverified']];
   document.querySelector('#scoreGrid').innerHTML = order.map(([key,label]) => `<div class="score ${key}"><b>${dossier.summary[key] || 0}</b><span>${label}</span></div>`).join('');
+  const traces = dossier.research_trace || [];
+  const researched = traces.filter(trace => trace.status === 'RESEARCHED');
+  const initialSources = traces.reduce((sum, trace) => sum + trace.initial_source_count, 0);
+  const addedSources = traces.reduce((sum, trace) => sum + trace.added_source_count, 0);
+  document.querySelector('#researchSummary').innerHTML = `<div><span class="step">Agent research trace</span><strong>${traces.length} coverage decisions</strong></div><div><b>${initialSources}</b><span>initial sources</span></div><div><b>${researched.length}</b><span>targeted re-searches</span></div><div><b>+${addedSources}</b><span>new sources found</span></div>`;
+  const traceByClaim = Object.fromEntries(traces.map(trace => [trace.claim_id, trace]));
   renderAnnotatedScene(dossier);
   document.querySelector('#verdicts').innerHTML = dossier.verdicts.map(verdict => {
     const correction = verdict.correction ? `<div class="correction"><span class="finding-label">Production fix</span><p>${escapeHtml(verdict.correction)}</p></div>` : '';
+    const trace = traceByClaim[verdict.claim.id];
+    const queryText = trace?.refined_queries?.length ? `<div class="research-queries">${trace.refined_queries.map(query => `<code>${escapeHtml(query)}</code>`).join('')}</div>` : '';
+    const researchTrace = trace ? `<div class="claim-research ${trace.status}"><span class="research-status">${trace.status === 'RESEARCHED' ? `Second pass · +${trace.added_source_count} sources` : trace.status === 'SUFFICIENT' ? 'Coverage sufficient' : 'Evidence gap remains'}</span><p>${escapeHtml(trace.rationale)}</p>${queryText}</div>` : '';
     const cited = new Set(verdict.citations || []);
     const sources = verdict.sources.map(source => `<a class="source ${cited.has(source.id) ? 'cited' : ''}" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer"><div class="source-head"><strong><span class="source-id">[${escapeHtml(source.id)}]</span>${escapeHtml(source.title)} ↗</strong><span class="source-stance ${escapeHtml(source.stance || 'CONTEXT')}">${escapeHtml(source.stance || 'CONTEXT')}</span></div><span>${escapeHtml(source.excerpt)}</span></a>`).join('');
-    return `<article id="verdict-${escapeHtml(verdict.claim.id)}" class="verdict" data-claim-id="${escapeHtml(verdict.claim.id)}"><div class="verdict-top"><span class="badge ${verdict.status}">${verdict.status}</span><div><div class="claim-category">${escapeHtml(verdict.claim.id)} · ${escapeHtml(verdict.claim.category)}</div><div class="claim-text">“${escapeHtml(verdict.claim.text)}”</div></div><div class="confidence"><b>${verdict.confidence}%</b><span>confidence</span></div></div><div class="finding"><span class="finding-label">Finding</span><div><p>${escapeHtml(verdict.finding)}</p>${correction}</div></div><div class="sources"><span class="finding-label">Parallel evidence</span><div class="source-list">${sources || '<span>No usable sources returned</span>'}</div></div><div class="decision-block"><span class="finding-label">Writer decision</span><div><div class="decision-actions"><button class="decision-button" data-decision="ACCEPT_FIX">Accept fix</button><button class="decision-button" data-decision="KEEP_AS_WRITTEN">Keep as written</button><button class="decision-button" data-decision="NEEDS_RESEARCH">Needs research</button></div><input class="decision-note" maxlength="240" placeholder="Optional rationale for the production record"></div></div></article>`;
+    return `<article id="verdict-${escapeHtml(verdict.claim.id)}" class="verdict" data-claim-id="${escapeHtml(verdict.claim.id)}"><div class="verdict-top"><span class="badge ${verdict.status}">${verdict.status}</span><div><div class="claim-category">${escapeHtml(verdict.claim.id)} · ${escapeHtml(verdict.claim.category)}</div><div class="claim-text">“${escapeHtml(verdict.claim.text)}”</div></div><div class="confidence"><b>${verdict.confidence}%</b><span>confidence</span></div></div>${researchTrace}<div class="finding"><span class="finding-label">Finding</span><div><p>${escapeHtml(verdict.finding)}</p>${correction}</div></div><div class="sources"><span class="finding-label">Parallel evidence</span><div class="source-list">${sources || '<span>No usable sources returned</span>'}</div></div><div class="decision-block"><span class="finding-label">Writer decision</span><div><div class="decision-actions"><button class="decision-button" data-decision="ACCEPT_FIX">Accept fix</button><button class="decision-button" data-decision="KEEP_AS_WRITTEN">Keep as written</button><button class="decision-button" data-decision="NEEDS_RESEARCH">Needs research</button></div><input class="decision-note" maxlength="240" placeholder="Optional rationale for the production record"></div></div></article>`;
   }).join('');
   updateDecisionSummary();
   results.classList.remove('hidden');

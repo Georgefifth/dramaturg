@@ -58,5 +58,12 @@ DEMO_DOSSIER = Dossier.model_validate({
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "Opening and fall of the Berlin Wall", "url": "https://www.berlin.de/en/history/8482274-8619314-opening-and-fall-of-the-berlin-wall.en.html", "excerpt": "By 11:30 p.m., the crowds had grown so large that the checkpoint commander—still without official orders—finally raised the barrier."}]
         }
     ],
+    "research_trace": [
+        {"claim_id": "C1", "status": "SUFFICIENT", "rationale": "Multiple authoritative timelines directly establish the opening date.", "initial_source_count": 3},
+        {"claim_id": "C2", "status": "RESEARCHED", "rationale": "The initial results described GSM standards but did not establish when a person could send an SMS.", "initial_source_count": 0, "refined_queries": ["Vodafone first SMS 1992"], "added_source_count": 1},
+        {"claim_id": "C3", "status": "RESEARCHED", "rationale": "A location-specific source was needed to distinguish a landmark from an operating checkpoint.", "initial_source_count": 0, "refined_queries": ["Brandenburg Gate crossing 1989"], "added_source_count": 1},
+        {"claim_id": "C4", "status": "SUFFICIENT", "rationale": "The primary-source transcript directly describes the prior travel requirements.", "initial_source_count": 1},
+        {"claim_id": "C5", "status": "SUFFICIENT", "rationale": "The official chronology directly records the announcement and checkpoint opening time.", "initial_source_count": 1}
+    ],
     "summary": {"total": 5, "verified": 0, "inaccurate": 5, "conflicted": 0, "unverified": 0}
 })
