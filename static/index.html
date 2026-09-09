@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Dramaturg verifies real-world screenplay details with Gemini and Parallel Search.">
+  <title>Dramaturg — Evidence before production</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/" aria-label="Dramaturg home"><span class="brand-mark">D</span><span>Dramaturg</span></a>
+    <div class="nav-meta"><span id="modeDot" class="status-dot"></span><span id="modeLabel">Checking live services</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Evidence before production</div>
+      <h1>Your story can be fictional.<br><em>Its details shouldn't be.</em></h1>
+      <p>Paste a screenplay scene. Dramaturg finds every real-world claim, checks it against the live web, and returns an accuracy dossier with sources—not guesses.</p>
+      <div class="trust-row"><span>Gemini reasoning</span><i></i><span>Parallel live search</span><i></i><span>Human final cut</span></div>
+    </section>
+
+    <section class="workspace">
+      <div class="editor-panel">
+        <div class="panel-head"><div><span class="step">01</span><h2>Screenplay scene</h2></div><span id="charCount">0 / 12,000</span></div>
+        <textarea id="sceneInput" maxlength="12000" spellcheck="false" placeholder="INT. LOCATION — NIGHT&#10;&#10;Paste a scene with real-world details to verify..."></textarea>
+        <div class="editor-actions">
+          <button id="loadSample" class="button ghost">Load Berlin sample</button>
+          <button id="analyze" class="button primary">Run live verification <span>→</span></button>
+        </div>
+        <p id="liveHint" class="microcopy"></p>
+      </div>
+
+      <aside class="method-panel">
+        <span class="step">02</span>
+        <h2>Evidence pipeline</h2>
+        <ol class="pipeline">
+          <li><span>1</span><div><strong>Extract claims</strong><small>Gemini isolates facts worth checking</small></div></li>
+          <li><span>2</span><div><strong>Search the live web</strong><small>Parallel retrieves traceable evidence</small></div></li>
+          <li><span>3</span><div><strong>Test each claim</strong><small>Evidence supports, refutes, or conflicts</small></div></li>
+          <li><span>4</span><div><strong>Keep human authority</strong><small>You decide what belongs in the script</small></div></li>
+        </ol>
+        <div class="method-note">No silent rewrites. No invented citations. Conflicting sources remain visible.</div>
+      </aside>
+    </section>
+
+    <section id="loading" class="loading hidden" aria-live="polite">
+      <div class="loader"><span></span><span></span><span></span></div>
+      <div><strong id="loadingTitle">Reading the scene</strong><p id="loadingText">Extracting externally verifiable claims…</p></div>
+    </section>
+
+    <section id="results" class="results hidden">
+      <div class="results-head">
+        <div><div class="eyebrow">Accuracy dossier · <span id="resultMode"></span></div><h2 id="dossierTitle">Scene review</h2></div>
+        <button id="exportBtn" class="button ghost">Export JSON</button>
+      </div>
+      <div id="scoreGrid" class="score-grid"></div>
+      <div class="ledger-head"><div><span class="step">03</span><h2>Claim ledger</h2></div><span>Source-linked findings</span></div>
+      <div id="verdicts" class="verdict-list"></div>
+    </section>
+  </main>
+
+  <footer><span>Dramaturg</span><p>Built for screenwriters and studio crews. The writer always has final authority.</p></footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
