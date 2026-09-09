@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: dramaturg
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PARALLEL_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: GEMINI_REQUEST_DELAY_SECONDS
+        value: "30"
