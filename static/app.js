@@ -4,11 +4,21 @@ const sampleButton = document.querySelector('#loadSample');
 const results = document.querySelector('#results');
 const loading = document.querySelector('#loading');
 const fileInput = document.querySelector('#scriptFile');
+const projectInput = document.querySelector('#projectName');
+const sceneInput = document.querySelector('#sceneName');
 let currentDossier = null;
 let liveReady = false;
 let decisions = {};
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+let savedMetadata = {};
+try { savedMetadata = JSON.parse(localStorage.getItem('dramaturg-metadata')) || {}; } catch { savedMetadata = {}; }
+projectInput.value = savedMetadata.project || projectInput.value;
+sceneInput.value = savedMetadata.scene || sceneInput.value;
+for (const field of [projectInput, sceneInput]) field.addEventListener('input', () => {
+  localStorage.setItem('dramaturg-metadata', JSON.stringify({project:projectInput.value, scene:sceneInput.value}));
+  if (currentDossier) renderProjectWorkspace();
+});
 
 async function loadConfig() {
   const config = await fetch('/api/config').then(response => response.json());
@@ -48,6 +58,8 @@ sampleButton.addEventListener('click', async () => {
   sampleButton.disabled = true;
   try {
     const {scene} = await fetch('/api/demo-scene').then(response => response.json());
+    projectInput.value = 'The Night the Wall Opened';
+    sceneInput.value = 'Apartment to the border';
     setScene(scene);
     const dossier = await fetch('/api/demo').then(response => response.json());
     renderDossier(dossier);
@@ -204,6 +216,38 @@ function renderRevision() {
   output.classList.remove('hidden');
 }
 
+const departmentFor = category => ({HISTORY:'Historical & Cultural',CULTURE:'Historical & Cultural',LOCATION:'Locations',LAW:'Legal & Standards',TECHNOLOGY:'Technical Advisors',PROFESSION:'Technical Advisors',OTHER:'Script Coordination'}[category] || 'Script Coordination');
+
+function projectStore() {
+  try { return JSON.parse(localStorage.getItem('dramaturg-projects')) || {}; } catch { return {}; }
+}
+
+function renderProjectWorkspace() {
+  const project = projectInput.value.trim() || 'Untitled Production';
+  const scene = sceneInput.value.trim() || 'Untitled Scene';
+  document.querySelector('#projectTitle').textContent = `${project} · ${scene}`;
+  const snapshots = projectStore()[project] || [];
+  document.querySelector('#savedScenes').innerHTML = snapshots.length
+    ? snapshots.map((snapshot,index) => `<button data-snapshot="${index}">${escapeHtml(snapshot.sceneName)}<span>${snapshot.dossier.summary.inaccurate} risks</span></button>`).join('')
+    : '<span>No saved scenes yet</span>';
+}
+
+function handoffItems() {
+  if (!currentDossier) return [];
+  return currentDossier.verdicts.filter(verdict => verdict.status !== 'VERIFIED').map(verdict => ({
+    department:departmentFor(verdict.claim.category),
+    claim_id:verdict.claim.id,
+    risk:verdict.claim.text,
+    action:verdict.correction || 'Obtain additional evidence before production.',
+    decision:decisions[verdict.claim.id]?.decision || 'PENDING'
+  }));
+}
+
+function renderHandoff() {
+  const grouped = handoffItems().reduce((groups,item) => ({...groups,[item.department]:[...(groups[item.department] || []),item]}), {});
+  document.querySelector('#handoffGroups').innerHTML = Object.entries(grouped).map(([department,items]) => `<section class="handoff-group"><div><span>${escapeHtml(department)}</span><b>${items.length}</b></div>${items.map(item => `<article><strong>${escapeHtml(item.claim_id)} · ${escapeHtml(item.risk)}</strong><p>${escapeHtml(item.action)}</p><small>${escapeHtml(item.decision.replaceAll('_',' '))}</small></article>`).join('')}</section>`).join('');
+}
+
 function renderDossier(dossier) {
   currentDossier = structuredClone(dossier);
   decisions = loadDecisions();
@@ -240,6 +284,8 @@ function renderDossier(dossier) {
   }
   updateDecisionSummary();
   renderRevision();
+  renderProjectWorkspace();
+  renderHandoff();
   results.classList.remove('hidden');
   results.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -287,6 +333,7 @@ function setDecision(card, decision) {
   saveDecisions();
   updateDecisionSummary();
   renderRevision();
+  renderHandoff();
 }
 
 function updateDecisionSummary() {
@@ -300,6 +347,45 @@ function updateDecisionSummary() {
     ? Object.entries(counts).map(([key,value]) => `${value} ${labels[key]}`).join(' · ')
     : 'The writer retains final authority.';
 }
+
+document.querySelector('#saveScene').addEventListener('click', event => {
+  if (!currentDossier) return;
+  const project = projectInput.value.trim() || 'Untitled Production';
+  const sceneName = sceneInput.value.trim() || 'Untitled Scene';
+  const store = projectStore();
+  const snapshot = {sceneName, dossier:currentDossier, decisions, savedAt:new Date().toISOString()};
+  const existing = (store[project] || []).filter(item => item.sceneName !== sceneName);
+  store[project] = [snapshot, ...existing].slice(0, 8);
+  localStorage.setItem('dramaturg-projects', JSON.stringify(store));
+  renderProjectWorkspace();
+  const original = event.currentTarget.textContent;
+  event.currentTarget.textContent = 'Scene saved';
+  setTimeout(() => event.currentTarget.textContent = original, 1500);
+});
+
+document.querySelector('#savedScenes').addEventListener('click', event => {
+  const button = event.target.closest('[data-snapshot]');
+  if (!button) return;
+  const snapshot = (projectStore()[projectInput.value.trim() || 'Untitled Production'] || [])[Number(button.dataset.snapshot)];
+  if (!snapshot) return;
+  sceneInput.value = snapshot.sceneName;
+  setScene(snapshot.dossier.scene);
+  currentDossier = structuredClone(snapshot.dossier);
+  decisions = snapshot.decisions || {};
+  saveDecisions();
+  renderDossier(snapshot.dossier);
+});
+
+document.querySelector('#copyHandoff').addEventListener('click', async event => {
+  const project = projectInput.value.trim() || 'Untitled Production';
+  const scene = sceneInput.value.trim() || 'Untitled Scene';
+  const lines = [`${project} — ${scene}`, 'PRODUCTION ACCURACY HANDOFF', ''];
+  for (const item of handoffItems()) lines.push(`[${item.department}] ${item.claim_id}: ${item.risk}\nAction: ${item.action}\nDecision: ${item.decision}\n`);
+  await navigator.clipboard.writeText(lines.join('\n'));
+  const original = event.currentTarget.textContent;
+  event.currentTarget.textContent = 'Handoff copied';
+  setTimeout(() => event.currentTarget.textContent = original, 1500);
+});
 
 document.querySelector('#copyRevision').addEventListener('click', async event => {
   if (!acceptedReplacements().length) return;
@@ -319,7 +405,7 @@ document.querySelector('#resetDecisions').addEventListener('click', () => {
 document.querySelector('#exportBtn').addEventListener('click', () => {
   if (!currentDossier) return;
   const decisionLog = currentDossier.verdicts.map(verdict => ({claim_id:verdict.claim.id, claim:verdict.claim.text, replacement_text:verdict.replacement_text, ...(decisions[verdict.claim.id] || {decision:'PENDING', note:'', decided_at:null})}));
-  const exported = {...currentDossier, original_scene:currentDossier.scene, revised_scene:revisedSceneText(), decision_log:decisionLog, exported_at:new Date().toISOString()};
+  const exported = {project:projectInput.value.trim() || 'Untitled Production', scene_name:sceneInput.value.trim() || 'Untitled Scene', ...currentDossier, original_scene:currentDossier.scene, revised_scene:revisedSceneText(), production_handoff:handoffItems(), decision_log:decisionLog, exported_at:new Date().toISOString()};
   const blob = new Blob([JSON.stringify(exported, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);

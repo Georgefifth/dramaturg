@@ -10,7 +10,7 @@ Film production has many creative tools, but one quiet bottleneck remains manual
 
 ## What it does
 
-Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini isolates claims that can be checked externally, and Parallel Search retrieves live evidence for each one. A Gemini coverage director then asks whether that evidence can actually support a verdict. It selects at most two consequential gaps, rewrites their search queries, and dispatches targeted second-pass Parallel searches before final verification. Exact claims are highlighted in the original screenplay, every source is classified by evidentiary stance, and findings cite source IDs directly. Writers close the review with Accept fix, Keep as written, or Needs research. Only accepted fixes enter a reversible Revision Workspace with visible before/after text; local decision persistence and the exported Decision Log preserve their final authority.
+Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier. Gemini isolates claims that can be checked externally, and Parallel Search retrieves live evidence for each one. A Gemini coverage director then asks whether that evidence can actually support a verdict. It selects at most two consequential gaps, rewrites their search queries, and dispatches targeted second-pass Parallel searches before final verification. Exact claims are highlighted in the original screenplay, every source is classified by evidentiary stance, and findings cite source IDs directly. Writers close the review with Accept fix, Keep as written, or Needs research. Only accepted fixes enter a reversible Revision Workspace with visible before/after text; local decision persistence and the exported Decision Log preserve their final authority. Project workspaces collect multiple reviewed scenes and route open risks into department-specific production handoffs.
 
 ## How we built it
 
@@ -29,6 +29,7 @@ The central design challenge was avoiding a second hallucination layer in the ve
 - A human decision loop with locally persisted choices, explicitly accepted screenplay replacements, a reversible revision workspace, and an exportable audit record.
 - Cache, per-IP limits, a global budget ceiling, and single concurrency to protect public API credentials.
 - Background jobs with real pipeline progress instead of a simulated loading animation.
+- Browser-local multi-scene project snapshots and department-routed production handoffs.
 - Local `.txt` and `.fountain` import with explicit data-flow disclosure.
 - A product experience that turns web research into actionable production corrections while protecting human authorship.
 

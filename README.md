@@ -38,6 +38,8 @@ Where most creative agents generate, Dramaturg verifies.
 - Writers close the loop with `Accept fix`, `Keep as written`, or `Needs research`; decisions persist locally across refreshes.
 - Accepting a fix applies only its exact replacement to a reversible Revision Workspace with visible deletions and insertions.
 - The revised scene can be copied directly, while JSON export includes original text, revised text, evidence, and the complete Decision Log.
+- Browser-local project workspaces save up to eight reviewed scene snapshots per production.
+- Open risks are automatically routed into Historical, Locations, Legal, Technical, or Script Coordination handoffs.
 - Repeated scenes use an in-memory evidence cache, while per-IP, daily, and concurrency limits protect public provider budgets.
 
 ## Architecture

@@ -25,6 +25,7 @@
     <section class="workspace">
       <div class="editor-panel">
         <div class="panel-head"><div><span class="step">01</span><h2>Screenplay scene</h2></div><span id="charCount">0 / 12,000</span></div>
+        <div class="project-fields"><label>Project<input id="projectName" maxlength="60" value="Untitled Production"></label><label>Scene<input id="sceneName" maxlength="60" value="Scene 1"></label></div>
         <textarea id="sceneInput" maxlength="12000" spellcheck="false" placeholder="INT. LOCATION — NIGHT&#10;&#10;Paste a scene with real-world details to verify..."></textarea>
         <div class="editor-actions">
           <div class="secondary-actions"><button id="loadSample" class="button ghost">Load evidence sample</button><button id="importScript" class="button ghost">Import .txt / .fountain</button></div>
@@ -60,6 +61,7 @@
         <div><div class="eyebrow">Accuracy dossier · <span id="resultMode"></span></div><h2 id="dossierTitle">Scene review</h2></div>
         <button id="exportBtn" class="button ghost">Export dossier + decisions</button>
       </div>
+      <div class="project-bar"><div><span class="step">Production workspace</span><strong id="projectTitle">Untitled Production · Scene 1</strong></div><div id="savedScenes" class="saved-scenes"></div><button id="saveScene" class="button primary">Save scene review</button></div>
       <div id="scoreGrid" class="score-grid"></div>
       <div id="researchSummary" class="research-summary"></div>
       <div class="decision-summary">
@@ -82,6 +84,10 @@
         <div class="revision-head"><div><span class="step">05</span><h2>Revision workspace</h2><p>Only fixes explicitly accepted by the writer appear here.</p></div><div class="revision-actions"><button id="resetDecisions" class="button ghost">Reset decisions</button><button id="copyRevision" class="button primary">Copy revised scene</button></div></div>
         <div id="revisionEmpty" class="revision-empty">Accept a production fix to build a reversible revised scene.</div>
         <pre id="revisedScene" class="revised-scene hidden"></pre>
+      </section>
+      <section class="handoff-panel">
+        <div class="revision-head"><div><span class="step">06</span><h2>Production handoff</h2><p>Open risks routed to the department that can resolve them.</p></div><button id="copyHandoff" class="button primary">Copy handoff</button></div>
+        <div id="handoffGroups" class="handoff-groups"></div>
       </section>
     </section>
   </main>
