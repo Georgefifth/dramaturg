@@ -2,6 +2,7 @@ import json
 import os
 import time
 from collections import Counter
+from collections.abc import Callable
 
 from dotenv import load_dotenv
 from google import genai
@@ -13,6 +14,7 @@ from models import Claim, Dossier, ResearchTrace, Source, Stance, Verdict
 
 
 load_dotenv()
+ProgressCallback = Callable[[str, str, int, int], None]
 
 
 class SourceAssessment(BaseModel):
@@ -146,10 +148,12 @@ def audit_coverage(claims: list[Claim], evidence_by_claim: dict[str, list[Source
     return [audit for audit in audits if audit.claim_id in known_ids]
 
 
-def expand_evidence(claims: list[Claim], evidence_by_claim: dict[str, list[Source]], audits: list[CoverageResult]) -> tuple[dict[str, list[Source]], list[ResearchTrace]]:
-    targets = {audit.claim_id: audit for audit in research_targets(audits)}
+def expand_evidence(claims: list[Claim], evidence_by_claim: dict[str, list[Source]], audits: list[CoverageResult], progress: ProgressCallback | None = None) -> tuple[dict[str, list[Source]], list[ResearchTrace]]:
+    target_list = research_targets(audits)
+    targets = {audit.claim_id: audit for audit in target_list}
     audit_map = {audit.claim_id: audit for audit in audits}
     traces = []
+    researched_count = 0
     for claim in claims:
         initial_count = len(evidence_by_claim[claim.id])
         audit = audit_map.get(claim.id)
@@ -161,7 +165,12 @@ def expand_evidence(claims: list[Claim], evidence_by_claim: dict[str, list[Sourc
             status = "SUFFICIENT" if audit.status.upper() == "SUFFICIENT" else "INSUFFICIENT"
             traces.append(ResearchTrace(claim_id=claim.id, status=status, rationale=audit.rationale, initial_source_count=initial_count, refined_queries=audit.refined_queries))
             continue
+        if progress:
+            progress("targeted_search", f"Parallel is researching the evidence gap for {claim.id}", researched_count, len(target_list))
         follow_up = search_claim(claim, target.refined_queries)
+        researched_count += 1
+        if progress:
+            progress("targeted_search", f"Parallel completed the second pass for {claim.id}", researched_count, len(target_list))
         merged = merge_sources(evidence_by_claim[claim.id], follow_up)
         added_count = len(merged) - initial_count
         evidence_by_claim[claim.id] = merged
@@ -235,16 +244,28 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
     return verdicts
 
 
-def analyze_scene(scene: str) -> Dossier:
+def analyze_scene(scene: str, progress: ProgressCallback | None = None) -> Dossier:
+    if progress:
+        progress("extracting", "Gemini is identifying verifiable screenplay claims", 0, 1)
     claims = extract_claims(scene)
     if not claims:
         raise ValueError("No externally verifiable claims were found in this scene")
-    evidence_by_claim = {claim.id: search_claim(claim) for claim in claims}
+    evidence_by_claim = {}
+    for index, claim in enumerate(claims, 1):
+        if progress:
+            progress("initial_search", f"Parallel is researching {claim.id} of {len(claims)}", index - 1, len(claims))
+        evidence_by_claim[claim.id] = search_claim(claim)
+        if progress:
+            progress("initial_search", f"Parallel completed {claim.id} of {len(claims)}", index, len(claims))
+    if progress:
+        progress("coverage_audit", "Gemini is auditing evidence coverage", 0, 1)
     audits = audit_coverage(claims, evidence_by_claim)
-    evidence_by_claim, research_trace = expand_evidence(claims, evidence_by_claim, audits)
+    evidence_by_claim, research_trace = expand_evidence(claims, evidence_by_claim, audits, progress)
+    if progress:
+        progress("verification", "Gemini is verifying the completed evidence record", 0, 1)
     verdicts = verify_claims(claims, evidence_by_claim)
     counts = Counter(verdict.status.lower() for verdict in verdicts)
-    return Dossier(
+    dossier = Dossier(
         title="Live screenplay accuracy dossier",
         mode="live",
         scene=scene,
@@ -258,3 +279,6 @@ def analyze_scene(scene: str) -> Dossier:
             "unverified": counts["unverified"],
         },
     )
+    if progress:
+        progress("complete", "The accuracy dossier is ready for human review", 1, 1)
+    return dossier

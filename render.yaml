@@ -19,3 +19,5 @@ services:
         value: "50"
       - key: ANALYSIS_CACHE_TTL_SECONDS
         value: "21600"
+      - key: JOB_TTL_SECONDS
+        value: "3600"

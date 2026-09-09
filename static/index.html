@@ -27,10 +27,12 @@
         <div class="panel-head"><div><span class="step">01</span><h2>Screenplay scene</h2></div><span id="charCount">0 / 12,000</span></div>
         <textarea id="sceneInput" maxlength="12000" spellcheck="false" placeholder="INT. LOCATION — NIGHT&#10;&#10;Paste a scene with real-world details to verify..."></textarea>
         <div class="editor-actions">
-          <button id="loadSample" class="button ghost">Load evidence sample</button>
+          <div class="secondary-actions"><button id="loadSample" class="button ghost">Load evidence sample</button><button id="importScript" class="button ghost">Import .txt / .fountain</button></div>
+          <input id="scriptFile" class="hidden" type="file" accept=".txt,.fountain,.md,text/plain">
           <button id="analyze" class="button primary">Run live verification <span>→</span></button>
         </div>
         <p id="liveHint" class="microcopy"></p>
+        <p class="privacy-copy">Files are read locally. Live analysis sends scene text to Gemini and claim-specific queries to Parallel; results remain only in volatile server memory.</p>
       </div>
 
       <aside class="method-panel">
@@ -50,7 +52,7 @@
 
     <section id="loading" class="loading hidden" aria-live="polite">
       <div class="loader"><span></span><span></span><span></span></div>
-      <div><strong id="loadingTitle">Reading the scene</strong><p id="loadingText">Extracting externally verifiable claims…</p></div>
+      <div class="loading-copy"><strong id="loadingTitle">Starting the research job</strong><p id="loadingText">Waiting for the agent's first progress event…</p><div class="live-progress"><span id="liveProgress"></span></div><small id="liveProgressLabel">0%</small></div>
     </section>
 
     <section id="results" class="results hidden">

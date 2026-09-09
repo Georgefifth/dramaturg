@@ -14,7 +14,7 @@ Dramaturg reads a screenplay scene and creates a source-linked accuracy dossier.
 
 ## How we built it
 
-The web application uses FastAPI and a responsive vanilla JavaScript interface deployed as a container on Render. It uses Google's official `google-genai` SDK for structured claim extraction, evidence coverage auditing, query reformulation, and final verification. It uses Parallel's official `parallel-web` SDK at runtime for every initial search and each agent-directed follow-up. Typed Pydantic contracts carry claims, sources, coverage decisions, research traces, verdicts, and the final dossier through the pipeline.
+The web application uses FastAPI and a responsive vanilla JavaScript interface deployed as a container on Render. Long analyses execute as background research jobs, while the interface polls genuine stage events from extraction, initial search, coverage audit, targeted re-search, and verification. It uses Google's official `google-genai` SDK for structured claim extraction, evidence coverage auditing, query reformulation, and final verification. It uses Parallel's official `parallel-web` SDK at runtime for every initial search and each agent-directed follow-up. Typed Pydantic contracts carry claims, sources, coverage decisions, research traces, verdicts, and the final dossier through the pipeline.
 
 ## Challenges we ran into
 
@@ -28,6 +28,8 @@ The central design challenge was avoiding a second hallucination layer in the ve
 - Claim-level provenance, exact script highlighting, source stances, and four honest evidence states.
 - A human decision loop with production-ready corrections and an exportable audit record.
 - Cache, per-IP limits, a global budget ceiling, and single concurrency to protect public API credentials.
+- Background jobs with real pipeline progress instead of a simulated loading animation.
+- Local `.txt` and `.fountain` import with explicit data-flow disclosure.
 - A product experience that turns web research into actionable production corrections while protecting human authorship.
 
 ## What we learned
@@ -36,4 +38,4 @@ Search is most valuable to a creative agent not only as inspiration, but as a co
 
 ## What's next
 
-Next we would add Fountain and PDF ingestion, scene-level collaboration for art and continuity departments, deeper source extraction for high-risk claims, and a decision log that records which findings a writer accepts or intentionally overrides.
+Next we would add PDF ingestion, scene-level collaboration for art and continuity departments, deeper source extraction for high-risk claims, durable project history, and signed review exports for production handoff.

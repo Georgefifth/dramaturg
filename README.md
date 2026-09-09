@@ -30,6 +30,8 @@ Where most creative agents generate, Dramaturg verifies.
 
 ## Review workflow
 
+- Paste a scene or import a local `.txt` / `.fountain` file; file contents are not uploaded until the writer starts live research.
+- Long analyses run as protected background jobs, and the interface polls real pipeline events instead of displaying simulated progress.
 - Exact screenplay quotes are located deterministically and highlighted by verdict status.
 - Selecting a highlight opens its claim-level finding; selecting a finding returns to the original line.
 - Every source is classified as `SUPPORTS`, `REFUTES`, `CONTEXT`, or `CONFLICTS`, and findings carry explicit source IDs.
@@ -99,7 +101,9 @@ uvicorn app:app --reload
 | `GET /api/config` | Reports whether live services are configured; never exposes keys |
 | `GET /api/demo-scene` | Returns the sample screenplay scene |
 | `GET /api/demo` | Returns the explicitly labeled sample dossier |
-| `POST /api/analyze` | Runs the live Gemini → Parallel → Gemini verification pipeline |
+| `POST /api/jobs` | Starts a protected background research job, or immediately returns a cached dossier |
+| `GET /api/jobs/{job_id}` | Returns real pipeline phase, progress, failure, or completed dossier |
+| `POST /api/analyze` | Synchronous compatibility endpoint for the same live pipeline |
 
 Live request:
 

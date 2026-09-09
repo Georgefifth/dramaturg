@@ -3,6 +3,7 @@ const analyzeButton = document.querySelector('#analyze');
 const sampleButton = document.querySelector('#loadSample');
 const results = document.querySelector('#results');
 const loading = document.querySelector('#loading');
+const fileInput = document.querySelector('#scriptFile');
 let currentDossier = null;
 let liveReady = false;
 let decisions = {};
@@ -27,6 +28,22 @@ function setScene(scene) {
 
 input.addEventListener('input', () => document.querySelector('#charCount').textContent = `${input.value.length.toLocaleString()} / 12,000`);
 
+document.querySelector('#importScript').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const scene = await file.text();
+  if (scene.length > 12000) {
+    document.querySelector('#liveHint').textContent = 'This file exceeds the 12,000-character scene limit. Import one scene at a time.';
+    fileInput.value = '';
+    return;
+  }
+  setScene(scene);
+  results.classList.add('hidden');
+  document.querySelector('#liveHint').textContent = `${file.name} was read locally. Run verification when you are ready to send this scene for research.`;
+  fileInput.value = '';
+});
+
 sampleButton.addEventListener('click', async () => {
   sampleButton.disabled = true;
   try {
@@ -39,6 +56,42 @@ sampleButton.addEventListener('click', async () => {
   }
 });
 
+const phaseLabels = {
+  queued:'Research job queued',
+  extracting:'Extracting verifiable claims',
+  initial_search:'Running the initial Parallel search',
+  coverage_audit:'Auditing evidence coverage',
+  targeted_search:'Researching a targeted evidence gap',
+  verification:'Testing the completed evidence record',
+  complete:'Accuracy dossier complete'
+};
+
+function updateJobProgress(job) {
+  const base = {queued:3, extracting:8, initial_search:12, coverage_audit:45, targeted_search:60, verification:75, complete:100}[job.phase] || 3;
+  const range = job.phase === 'initial_search' ? 28 : job.phase === 'targeted_search' ? 10 : 0;
+  const fraction = job.total ? job.completed / job.total : 0;
+  const percent = Math.min(100, Math.round(base + range * fraction));
+  document.querySelector('#loadingTitle').textContent = phaseLabels[job.phase] || 'Research in progress';
+  document.querySelector('#loadingText').textContent = job.message;
+  document.querySelector('#liveProgress').style.width = `${percent}%`;
+  document.querySelector('#liveProgressLabel').textContent = `${percent}% · live agent event`;
+}
+
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+async function waitForJob(jobId) {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.detail || 'Research job unavailable');
+    updateJobProgress(job);
+    if (job.status === 'complete') return job.dossier;
+    if (job.status === 'failed') throw new Error(job.message);
+    await wait(1000);
+  }
+  throw new Error('The research job exceeded the ten-minute safety window.');
+}
+
 analyzeButton.addEventListener('click', async () => {
   const scene = input.value.trim();
   if (scene.length < 80) {
@@ -49,32 +102,19 @@ analyzeButton.addEventListener('click', async () => {
   analyzeButton.disabled = true;
   results.classList.add('hidden');
   loading.classList.remove('hidden');
-  const stages = [
-    ['Extracting claims', 'Gemini is isolating dates, places, procedures, and period details…'],
-    ['Running the first search pass', 'Parallel is retrieving source-linked evidence for every claim…'],
-    ['Auditing evidence coverage', 'Gemini is looking for gaps that could materially change a verdict…'],
-    ['Researching targeted gaps', 'Parallel may run a focused second pass for up to two claims…'],
-    ['Respecting the rate limit', 'Pausing before the evidence-constrained verification pass…'],
-    ['Testing the complete record', 'Gemini is classifying sources and checking every claim…']
-  ];
-  let stage = 0;
-  const timer = setInterval(() => {
-    const item = stages[Math.min(stage++, stages.length - 1)];
-    document.querySelector('#loadingTitle').textContent = item[0];
-    document.querySelector('#loadingText').textContent = item[1];
-  }, 8500);
+  updateJobProgress({phase:'queued', message:'Starting a protected background research job', completed:0, total:1});
   try {
-    const response = await fetch('/api/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({scene})});
+    const response = await fetch('/api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({scene})});
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || 'Analysis failed');
-    renderDossier(payload);
-    document.querySelector('#liveHint').textContent = response.headers.get('X-Dramaturg-Cache') === 'HIT'
+    const dossier = payload.status === 'complete' ? payload.dossier : await waitForJob(payload.jobId);
+    renderDossier(dossier);
+    document.querySelector('#liveHint').textContent = payload.cache === 'HIT'
       ? 'Loaded from the evidence cache. No provider calls were spent.'
       : 'Live dossier complete. Evidence is cached for repeated review.';
   } catch (error) {
     document.querySelector('#liveHint').textContent = error.message;
   } finally {
-    clearInterval(timer);
     loading.classList.add('hidden');
     analyzeButton.disabled = !liveReady;
   }
