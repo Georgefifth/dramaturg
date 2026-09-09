@@ -22,6 +22,7 @@ DEMO_DOSSIER = Dossier.model_validate({
             "status": "INACCURATE", "confidence": 100,
             "finding": "The border crossings opened on the night of November 9, 1989—not 1987 [S1].",
             "correction": "Change the scene heading to NOVEMBER 9, 1989.",
+            "replacement_text": "NOVEMBER 9, 1989",
             "citations": ["S1"],
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "Opening and fall of the Berlin Wall", "url": "https://www.berlin.de/en/history/8482274-8619314-opening-and-fall-of-the-berlin-wall.en.html", "excerpt": "At the end of a press conference in the early evening of 9 November 1989, Günter Schabowski announced a new travel regulation for GDR citizens."}]
         },
@@ -30,6 +31,7 @@ DEMO_DOSSIER = Dossier.model_validate({
             "status": "INACCURATE", "confidence": 99,
             "finding": "SMS did not exist as a usable mobile service in 1987. The first documented SMS was sent in December 1992 from a computer to a handset [S1].",
             "correction": "Use a landline, pager, or an in-person rendezvous; remove the text message.",
+            "replacement_text": "uses the apartment landline to call her brother",
             "citations": ["S1"],
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "25 years since the world's first text message", "url": "https://www.vodafone.com/news/newsroom/technology/25-anniversary-text-message", "excerpt": "In 1992, Neil Papworth sent the first ever text message from a computer to his colleague Richard Jarvis."}]
         },
@@ -38,6 +40,7 @@ DEMO_DOSSIER = Dossier.model_validate({
             "status": "INACCURATE", "confidence": 94,
             "finding": "The Brandenburg Gate was a sealed landmark in the border zone, not an operating civilian crossing on November 9. Bornholmer Straße was the first crossing opened [S1].",
             "correction": "Move the crossing to Bornholmer Straße for the strongest historical accuracy, or to Checkpoint Charlie later that night.",
+            "replacement_text": "crosses at Bornholmer Straße into West Berlin",
             "citations": ["S1"],
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "The Site Where the Wall Opened Up", "url": "https://www.orte-der-einheit.de/en/bornholmer-strasse", "excerpt": "Thousands of East Berliners headed to Bornholmer Straße. At 11:30 p.m. the barrier was raised; by midnight the other crossings were open."}]
         },
@@ -46,6 +49,7 @@ DEMO_DOSSIER = Dossier.model_validate({
             "status": "INACCURATE", "confidence": 97,
             "finding": "Private travel had required proof of need or family relationships. The newly announced rules removed those requirements [S1].",
             "correction": "Have the guard face an unprecedented crowd and no clear orders; Anna should not possess a routine tourist visa.",
+            "replacement_text": "crossing has been tightly restricted until tonight",
             "citations": ["S1"],
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "Günter Schabowski's Press Conference", "url": "https://digitalarchive.wilsoncenter.org/document/gunter-schabowskis-press-conference-gdr-international-press-center-653-701-pm", "excerpt": "Applications for private travel could now be made without the previously existing requirements of demonstrating need or proving familial relationships."}]
         },
@@ -54,6 +58,7 @@ DEMO_DOSSIER = Dossier.model_validate({
             "status": "INACCURATE", "confidence": 98,
             "finding": "Schabowski made a confused announcement shortly before 7 p.m.; guards did not receive a direct order. Bornholmer Straße raised its barrier around 11:30 p.m. [S1].",
             "correction": "Change the line to: “No one gave them an order. Bornholmer just raised the barrier.”",
+            "replacement_text": "No one gave them an order. Bornholmer just raised the barrier.",
             "citations": ["S1"],
             "sources": [{"id": "S1", "stance": "REFUTES", "title": "Opening and fall of the Berlin Wall", "url": "https://www.berlin.de/en/history/8482274-8619314-opening-and-fall-of-the-berlin-wall.en.html", "excerpt": "By 11:30 p.m., the crowds had grown so large that the checkpoint commander—still without official orders—finally raised the barrier."}]
         }

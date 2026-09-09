@@ -32,6 +32,7 @@ class Verdict(BaseModel):
     confidence: int = Field(ge=0, le=100)
     finding: str
     correction: str | None = None
+    replacement_text: str | None = None
     citations: list[str] = Field(default_factory=list)
     sources: list[Source]
 

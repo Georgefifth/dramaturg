@@ -35,6 +35,7 @@ class VerificationResult(BaseModel):
     confidence: int = Field(ge=0, le=100)
     finding: str
     correction: str | None = None
+    replacement_text: str | None = None
     citations: list[str] = Field(default_factory=list)
     source_assessments: list[SourceAssessment] = Field(default_factory=list)
 
@@ -44,7 +45,7 @@ Extract only concrete, externally verifiable real-world claims from the screenpl
 
 COVERAGE_PROMPT = """You are the evidence coverage director in a screenplay research agent. Audit whether the attached Parallel Search excerpts are sufficient to judge each claim without relying on model memory. Status must be exactly SUFFICIENT or NEEDS_MORE. Use NEEDS_MORE only when a specific missing fact, primary source, date, jurisdiction, or credible counter-source could materially change the verdict. For NEEDS_MORE, provide one or two concise 3-6 word refined search queries targeting that gap. Select at most two claims for NEEDS_MORE across the entire batch; prioritize the highest production risk. Explain the evidence gap in one compact sentence. Do not judge whether the screenplay claim is true yet."""
 
-VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Evidence may include an initial search and a coverage-directed second search. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. For every source, classify its stance as SUPPORTS, REFUTES, CONTEXT, or CONFLICTS. Include only source IDs that directly justify the finding in citations, and cite those IDs inline like [S1]. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent. Do not invent citations or facts."""
+VERIFICATION_PROMPT = """You are the verification stage of Dramaturg. Judge every supplied screenplay claim only from the web evidence attached to that claim. Evidence may include an initial search and a coverage-directed second search. Return exactly one result per claim_id. Never use unsupported memory. Status must be exactly VERIFIED, INACCURATE, CONFLICTED, or UNVERIFIED. Use CONFLICTED when credible sources materially disagree and explain both sides. Use UNVERIFIED when evidence is insufficient. For every source, classify its stance as SUPPORTS, REFUTES, CONTEXT, or CONFLICTS. Include only source IDs that directly justify the finding in citations, and cite those IDs inline like [S1]. State each finding compactly. For inaccurate claims, give one production-ready correction that preserves dramatic intent and a replacement_text containing only the exact screenplay text that should replace script_quote, matching its voice and formatting. Set replacement_text null for every other status. Do not invent citations or facts."""
 
 
 def _gemini_client() -> genai.Client:
@@ -70,6 +71,21 @@ def locate_claim(scene: str, claim: Claim) -> Claim:
         located.start_offset = start
         located.end_offset = start + len(located.script_quote)
     return located
+
+
+def apply_accepted_replacements(scene: str, verdicts: list[Verdict], accepted_ids: set[str]) -> str:
+    replacements = []
+    for verdict in verdicts:
+        claim = verdict.claim
+        if verdict.claim.id not in accepted_ids or not verdict.replacement_text or claim.start_offset is None or claim.end_offset is None:
+            continue
+        if scene[claim.start_offset:claim.end_offset].lower() != claim.script_quote.lower():
+            continue
+        replacements.append((claim.start_offset, claim.end_offset, verdict.replacement_text))
+    revised = scene
+    for start, end, replacement in sorted(replacements, reverse=True):
+        revised = revised[:start] + replacement + revised[end:]
+    return revised
 
 
 def extract_claims(scene: str) -> list[Claim]:
@@ -132,7 +148,7 @@ def audit_coverage(claims: list[Claim], evidence_by_claim: dict[str, list[Source
     time.sleep(max(0, float(os.getenv("GEMINI_REQUEST_DELAY_SECONDS", "30"))))
     client = _gemini_client()
     response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+        model=os.getenv("GEMINI_AUDIT_MODEL", "gemini-3.5-flash-lite"),
         contents=json.dumps(payload, ensure_ascii=False),
         config=types.GenerateContentConfig(
             system_instruction=COVERAGE_PROMPT,
@@ -192,6 +208,7 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
         payload.append({
             "claim_id": claim.id,
             "claim": claim.text,
+            "script_quote": claim.script_quote,
             "question": claim.question,
             "evidence": [source.model_dump() for source in sources],
         })
@@ -223,6 +240,7 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
                 confidence=0,
                 finding="Parallel Search returned no usable evidence for this claim." if not sources else "No verification result was returned for this claim.",
                 correction=None,
+                replacement_text=None,
                 citations=[],
                 sources=sources,
             ))
@@ -238,6 +256,7 @@ def verify_claims(claims: list[Claim], evidence_by_claim: dict[str, list[Source]
             confidence=result.confidence,
             finding=result.finding,
             correction=result.correction,
+            replacement_text=result.replacement_text if status == "INACCURATE" else None,
             citations=citations,
             sources=sources,
         ))

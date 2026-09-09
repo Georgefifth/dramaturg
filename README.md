@@ -35,8 +35,9 @@ Where most creative agents generate, Dramaturg verifies.
 - Exact screenplay quotes are located deterministically and highlighted by verdict status.
 - Selecting a highlight opens its claim-level finding; selecting a finding returns to the original line.
 - Every source is classified as `SUPPORTS`, `REFUTES`, `CONTEXT`, or `CONFLICTS`, and findings carry explicit source IDs.
-- Writers close the loop with `Accept fix`, `Keep as written`, or `Needs research`.
-- JSON export includes the evidence dossier and the writer's complete Decision Log.
+- Writers close the loop with `Accept fix`, `Keep as written`, or `Needs research`; decisions persist locally across refreshes.
+- Accepting a fix applies only its exact replacement to a reversible Revision Workspace with visible deletions and insertions.
+- The revised scene can be copied directly, while JSON export includes original text, revised text, evidence, and the complete Decision Log.
 - Repeated scenes use an in-memory evidence cache, while per-IP, daily, and concurrency limits protect public provider budgets.
 
 ## Architecture
@@ -87,6 +88,7 @@ For live verification:
 export GEMINI_API_KEY="your-key"
 export PARALLEL_API_KEY="your-key"
 export GEMINI_MODEL="gemini-3.5-flash"
+export GEMINI_AUDIT_MODEL="gemini-3.5-flash-lite"
 export GEMINI_REQUEST_DELAY_SECONDS="30"
 uvicorn app:app --reload
 ```
@@ -139,8 +141,9 @@ Create the referenced secrets in Google Cloud Secret Manager before deployment. 
 - Conflicting credible sources are preserved as `CONFLICTED` rather than collapsed into false certainty.
 - Missing evidence becomes `UNVERIFIED`.
 - Source URLs, excerpts, evidence stances, and citation IDs remain visible.
-- The tool proposes corrections but never edits the screenplay automatically.
-- Writer overrides and research decisions are preserved in the exported production record.
+- The tool proposes an exact replacement but applies it only after the writer explicitly selects `Accept fix`.
+- Original text remains visible beside every accepted change, and all revisions are reversible.
+- Writer overrides and research decisions persist locally and are preserved in the exported production record.
 - Public analysis is rate-limited, single-concurrency, and cached to protect API budgets.
 
 ## License

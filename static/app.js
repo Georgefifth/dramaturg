@@ -146,9 +146,67 @@ function renderAnnotatedScene(dossier) {
   document.querySelector('#annotatedScene').innerHTML = parts.join('');
 }
 
+function decisionStorageKey() {
+  if (!currentDossier) return null;
+  let hash = 5381;
+  for (const character of currentDossier.scene) hash = ((hash << 5) + hash) ^ character.charCodeAt(0);
+  return `dramaturg-decisions-${hash >>> 0}`;
+}
+
+function loadDecisions() {
+  try {
+    return JSON.parse(localStorage.getItem(decisionStorageKey())) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDecisions() {
+  const key = decisionStorageKey();
+  if (key) localStorage.setItem(key, JSON.stringify(decisions));
+}
+
+function acceptedReplacements() {
+  if (!currentDossier) return [];
+  return currentDossier.verdicts.map(verdict => ({verdict, ...claimOffsets(verdict, currentDossier.scene)}))
+    .filter(item => decisions[item.verdict.claim.id]?.decision === 'ACCEPT_FIX' && item.verdict.replacement_text && Number.isInteger(item.start) && Number.isInteger(item.end))
+    .sort((a, b) => a.start - b.start);
+}
+
+function revisedSceneText() {
+  let revised = currentDossier?.scene || '';
+  for (const item of [...acceptedReplacements()].reverse()) revised = revised.slice(0, item.start) + item.verdict.replacement_text + revised.slice(item.end);
+  return revised;
+}
+
+function renderRevision() {
+  if (!currentDossier) return;
+  const replacements = acceptedReplacements();
+  const empty = document.querySelector('#revisionEmpty');
+  const output = document.querySelector('#revisedScene');
+  if (!replacements.length) {
+    empty.classList.remove('hidden');
+    output.classList.add('hidden');
+    output.innerHTML = '';
+    return;
+  }
+  let cursor = 0;
+  const parts = [];
+  for (const item of replacements) {
+    if (item.start < cursor) continue;
+    parts.push(escapeHtml(currentDossier.scene.slice(cursor, item.start)));
+    parts.push(`<span class="revision-change"><del>${escapeHtml(currentDossier.scene.slice(item.start, item.end))}</del><ins>${escapeHtml(item.verdict.replacement_text)}</ins></span>`);
+    cursor = item.end;
+  }
+  parts.push(escapeHtml(currentDossier.scene.slice(cursor)));
+  output.innerHTML = parts.join('');
+  empty.classList.add('hidden');
+  output.classList.remove('hidden');
+}
+
 function renderDossier(dossier) {
   currentDossier = structuredClone(dossier);
-  decisions = {};
+  decisions = loadDecisions();
   document.querySelector('#resultMode').textContent = dossier.mode === 'live' ? 'Live web evidence' : 'Curated evidence sample';
   document.querySelector('#dossierTitle').textContent = dossier.title;
   const order = [['total','Claims'],['verified','Verified'],['inaccurate','Inaccurate'],['conflicted','Conflicted'],['unverified','Unverified']];
@@ -161,15 +219,27 @@ function renderDossier(dossier) {
   const traceByClaim = Object.fromEntries(traces.map(trace => [trace.claim_id, trace]));
   renderAnnotatedScene(dossier);
   document.querySelector('#verdicts').innerHTML = dossier.verdicts.map(verdict => {
-    const correction = verdict.correction ? `<div class="correction"><span class="finding-label">Production fix</span><p>${escapeHtml(verdict.correction)}</p></div>` : '';
+    const proposed = verdict.replacement_text ? `<code class="proposed-replacement">Replace with: ${escapeHtml(verdict.replacement_text)}</code>` : '';
+    const correction = verdict.correction ? `<div class="correction"><span class="finding-label">Production fix</span><p>${escapeHtml(verdict.correction)}</p>${proposed}</div>` : '';
     const trace = traceByClaim[verdict.claim.id];
     const queryText = trace?.refined_queries?.length ? `<div class="research-queries">${trace.refined_queries.map(query => `<code>${escapeHtml(query)}</code>`).join('')}</div>` : '';
     const researchTrace = trace ? `<div class="claim-research ${trace.status}"><span class="research-status">${trace.status === 'RESEARCHED' ? `Second pass · +${trace.added_source_count} sources` : trace.status === 'SUFFICIENT' ? 'Coverage sufficient' : 'Evidence gap remains'}</span><p>${escapeHtml(trace.rationale)}</p>${queryText}</div>` : '';
     const cited = new Set(verdict.citations || []);
+    const canReplace = Boolean(verdict.replacement_text && Number.isInteger(verdict.claim.start_offset) && Number.isInteger(verdict.claim.end_offset));
     const sources = verdict.sources.map(source => `<a class="source ${cited.has(source.id) ? 'cited' : ''}" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer"><div class="source-head"><strong><span class="source-id">[${escapeHtml(source.id)}]</span>${escapeHtml(source.title)} ↗</strong><span class="source-stance ${escapeHtml(source.stance || 'CONTEXT')}">${escapeHtml(source.stance || 'CONTEXT')}</span></div><span>${escapeHtml(source.excerpt)}</span></a>`).join('');
-    return `<article id="verdict-${escapeHtml(verdict.claim.id)}" class="verdict" data-claim-id="${escapeHtml(verdict.claim.id)}"><div class="verdict-top"><span class="badge ${verdict.status}">${verdict.status}</span><div><div class="claim-category">${escapeHtml(verdict.claim.id)} · ${escapeHtml(verdict.claim.category)}</div><div class="claim-text">“${escapeHtml(verdict.claim.text)}”</div></div><div class="confidence"><b>${verdict.confidence}%</b><span>confidence</span></div></div>${researchTrace}<div class="finding"><span class="finding-label">Finding</span><div><p>${escapeHtml(verdict.finding)}</p>${correction}</div></div><div class="sources"><span class="finding-label">Parallel evidence</span><div class="source-list">${sources || '<span>No usable sources returned</span>'}</div></div><div class="decision-block"><span class="finding-label">Writer decision</span><div><div class="decision-actions"><button class="decision-button" data-decision="ACCEPT_FIX">Accept fix</button><button class="decision-button" data-decision="KEEP_AS_WRITTEN">Keep as written</button><button class="decision-button" data-decision="NEEDS_RESEARCH">Needs research</button></div><input class="decision-note" maxlength="240" placeholder="Optional rationale for the production record"></div></div></article>`;
+    return `<article id="verdict-${escapeHtml(verdict.claim.id)}" class="verdict" data-claim-id="${escapeHtml(verdict.claim.id)}"><div class="verdict-top"><span class="badge ${verdict.status}">${verdict.status}</span><div><div class="claim-category">${escapeHtml(verdict.claim.id)} · ${escapeHtml(verdict.claim.category)}</div><div class="claim-text">“${escapeHtml(verdict.claim.text)}”</div></div><div class="confidence"><b>${verdict.confidence}%</b><span>confidence</span></div></div>${researchTrace}<div class="finding"><span class="finding-label">Finding</span><div><p>${escapeHtml(verdict.finding)}</p>${correction}</div></div><div class="sources"><span class="finding-label">Parallel evidence</span><div class="source-list">${sources || '<span>No usable sources returned</span>'}</div></div><div class="decision-block"><span class="finding-label">Writer decision</span><div><div class="decision-actions"><button class="decision-button" data-decision="ACCEPT_FIX" ${canReplace ? '' : 'disabled'}>${canReplace ? 'Accept fix' : 'No applicable fix'}</button><button class="decision-button" data-decision="KEEP_AS_WRITTEN">Keep as written</button><button class="decision-button" data-decision="NEEDS_RESEARCH">Needs research</button></div><input class="decision-note" maxlength="240" placeholder="Optional rationale for the production record"></div></div></article>`;
   }).join('');
+  for (const [id, saved] of Object.entries(decisions)) {
+    const card = document.querySelector(`#verdict-${CSS.escape(id)}`);
+    if (!card) continue;
+    card.classList.add('decided');
+    card.querySelectorAll('.decision-button').forEach(button => button.classList.toggle('selected', button.dataset.decision === saved.decision));
+    const note = card.querySelector('.decision-note');
+    note.value = saved.note || '';
+    note.classList.toggle('visible', saved.decision !== 'ACCEPT_FIX');
+  }
   updateDecisionSummary();
+  renderRevision();
   results.classList.remove('hidden');
   results.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -201,7 +271,10 @@ document.querySelector('#verdicts').addEventListener('click', event => {
 document.querySelector('#verdicts').addEventListener('input', event => {
   if (!event.target.classList.contains('decision-note')) return;
   const id = event.target.closest('.verdict').dataset.claimId;
-  if (decisions[id]) decisions[id].note = event.target.value.trim();
+  if (decisions[id]) {
+    decisions[id].note = event.target.value.trim();
+    saveDecisions();
+  }
 });
 
 function setDecision(card, decision) {
@@ -211,7 +284,9 @@ function setDecision(card, decision) {
   card.querySelectorAll('.decision-button').forEach(button => button.classList.toggle('selected', button.dataset.decision === decision));
   const note = card.querySelector('.decision-note');
   note.classList.toggle('visible', decision !== 'ACCEPT_FIX');
+  saveDecisions();
   updateDecisionSummary();
+  renderRevision();
 }
 
 function updateDecisionSummary() {
@@ -226,10 +301,25 @@ function updateDecisionSummary() {
     : 'The writer retains final authority.';
 }
 
+document.querySelector('#copyRevision').addEventListener('click', async event => {
+  if (!acceptedReplacements().length) return;
+  await navigator.clipboard.writeText(revisedSceneText());
+  const original = event.currentTarget.textContent;
+  event.currentTarget.textContent = 'Copied';
+  setTimeout(() => event.currentTarget.textContent = original, 1500);
+});
+
+document.querySelector('#resetDecisions').addEventListener('click', () => {
+  if (!currentDossier) return;
+  localStorage.removeItem(decisionStorageKey());
+  decisions = {};
+  renderDossier(currentDossier);
+});
+
 document.querySelector('#exportBtn').addEventListener('click', () => {
   if (!currentDossier) return;
-  const decisionLog = currentDossier.verdicts.map(verdict => ({claim_id:verdict.claim.id, claim:verdict.claim.text, ...(decisions[verdict.claim.id] || {decision:'PENDING', note:'', decided_at:null})}));
-  const exported = {...currentDossier, decision_log:decisionLog, exported_at:new Date().toISOString()};
+  const decisionLog = currentDossier.verdicts.map(verdict => ({claim_id:verdict.claim.id, claim:verdict.claim.text, replacement_text:verdict.replacement_text, ...(decisions[verdict.claim.id] || {decision:'PENDING', note:'', decided_at:null})}));
+  const exported = {...currentDossier, original_scene:currentDossier.scene, revised_scene:revisedSceneText(), decision_log:decisionLog, exported_at:new Date().toISOString()};
   const blob = new Blob([JSON.stringify(exported, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
